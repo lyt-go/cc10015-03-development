@@ -41,6 +41,14 @@ def list_entries(
     return PageResult(items=items, total=total, page=page, size=size)
 
 
+@router.get("/calibers")
+def list_calibers() -> dict[str, Any]:
+    """指标定义 V003 读取看板聚合快照消费的指标编码、口径版本与统计粒度。"""
+    items = sorted(service.caliber_reference().values(),
+                   key=lambda item: (item["指标编码"], item["口径版本"]))
+    return {"items": items, "total": len(items)}
+
+
 @router.get("/export")
 def export_entries(
     request: Request,

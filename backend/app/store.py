@@ -7,19 +7,37 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from app.board_data import SEED_OVERRIDES
 from app.seed import SEED_ROWS
+
+# 快照与留存矩阵是看板内部消费的数据表，不作为业务模块出现在概览里。
+INTERNAL_MODULES = {
+    "retention_matrix",
+    "board_snapshot",
+    "board_snapshot_card",
+    "experiment_snapshot",
+    "board_snapshot_stage",
+    "board_verification",
+}
+
+SNAPSHOT_MODULES = ("retention_matrix", "board_snapshot", "board_snapshot_card",
+                    "experiment_snapshot", "board_snapshot_stage", "board_verification")
 
 
 class Store:
     def __init__(self) -> None:
+        seed: dict[str, list[dict[str, Any]]] = {name: rows for name, rows in SEED_ROWS.items()}
+        seed.update(SEED_OVERRIDES)
+        for name in SNAPSHOT_MODULES:
+            seed.setdefault(name, [])
         self._tables: dict[str, list[dict[str, Any]]] = {
-            name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
+            name: [dict(row) for row in rows] for name, rows in seed.items()
         }
         self._versions: dict[str, int] = {name: 1 for name in self._tables}
         self._created_at: dict[str, float] = {name: time.time() for name in self._tables}
 
     def module_names(self) -> list[str]:
-        return sorted(self._tables)
+        return sorted(name for name in self._tables if name not in INTERNAL_MODULES)
 
     def rows(self, module: str) -> list[dict[str, Any]]:
         return self._tables.setdefault(module, [])

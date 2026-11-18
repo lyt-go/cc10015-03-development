@@ -14,6 +14,17 @@ NEGATIVE_ACTIONS = []
 
 
 class MetricDefService:
+    def caliber_reference(self) -> dict[str, str]:
+        """读取看板聚合快照消费的口径：指标编码 → 口径版本 / 统计粒度。
+
+        指标定义 V003 只校验快照里已登记的指标；看板快照尚未生成时为空目录。
+        """
+        from app.services.evaluate_board_snapshot import EvaluateBoardSnapshotService
+
+        return {
+            item["指标编码"]: item
+            for item in EvaluateBoardSnapshotService().registered_calibers()
+        }
     def list_entries(
         self,
         *,
@@ -41,6 +52,17 @@ class MetricDefService:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]
         if missing:
             return None, missing
+        registry = self.caliber_reference()
+        metric_code = str(values.get("指标编号") or "").strip()
+        caliber = registry.get(metric_code)
+        if caliber is not None:
+            # 跨模块联动（V003）：指标编码已被看板快照消费，版本与统计粒度必须与快照口径一致。
+            version = str(values.get("口径版本") or "").strip()
+            if version and version != caliber["口径版本"]:
+                return None, [f"口径版本与看板快照口径 {caliber['口径版本']}（{caliber['口径版本编号']}）不一致"]
+            granularity = str(values.get("统计粒度") or "").strip()
+            if granularity and granularity != caliber["统计粒度"]:
+                return None, [f"统计粒度「{granularity}」未在看板快照口径中登记（应为 {caliber['统计粒度']}）"]
         rows = store.rows(MODULE)
         entry = {"id": max((int(row.get("id", 0)) for row in rows), default=0) + 1}
         entry.update({field: values.get(field) for field in LIST_FIELDS})

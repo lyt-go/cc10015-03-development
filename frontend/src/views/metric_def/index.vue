@@ -11,6 +11,13 @@
       </div>
     </header>
 
+    <div v-if="calibers.length" class="caliber-reference" data-testid="caliber-reference">
+      <strong>看板聚合快照口径（V003）</strong>
+      <span v-for="item in calibers" :key="item.指标编码 + item.口径版本" class="caliber-chip">
+        {{ item.指标编码 }} · {{ item.口径版本 }}（{{ item.口径版本编号 }}）· 粒度 {{ item.统计粒度 }}
+      </span>
+    </div>
+
     <div class="stat-row">
       <article v-for="item in stats" :key="item.label" class="stat-card">
         <span class="stat-label">{{ item.label }}</span>
@@ -63,6 +70,7 @@
           <span>{{ field }}</span>
           <input v-model="createValues[field]" :data-testid="`create-${field}`" required />
         </label>
+        <p v-if="errorMessage" class="error-text" data-testid="create-error">{{ errorMessage }}</p>
         <div class="page-actions">
           <button class="btn" type="button" @click="showCreate = false">取消</button>
           <button class="btn primary" data-testid="submit-create" type="submit" :disabled="creating">
@@ -82,7 +90,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
-import { request } from '@/api/client'
+import { fetchJson, request } from '@/api/client'
 
 type Row = Record<string, string | number | null>
 
@@ -92,6 +100,7 @@ const actions = ["提交校验", "标记生效", "标记废弃"]
 const statuses = ["草稿", "待校验", "已生效", "已废弃"]
 const metricNames = ["指标定义总数", "待校验指标", "已生效指标"]
 
+const calibers = ref<Record<string, string>[]>([])
 const rows = ref<Row[]>([])
 const total = ref(0)
 const errorMessage = ref('')
@@ -184,5 +193,38 @@ async function reload() {
   }
 }
 
-onMounted(reload)
+async function loadCalibers() {
+  try {
+    const payload = await fetchJson<{ items: Record<string, string>[] }>(`${ENDPOINT}/calibers`)
+    calibers.value = payload.items ?? []
+  } catch {
+    calibers.value = []
+  }
+}
+
+onMounted(() => {
+  void loadCalibers()
+  void reload()
+})
 </script>
+
+<style scoped>
+.caliber-reference {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.caliber-chip {
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+</style>
